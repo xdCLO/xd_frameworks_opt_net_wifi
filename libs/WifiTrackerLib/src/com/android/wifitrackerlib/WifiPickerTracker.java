@@ -96,6 +96,7 @@ public class WifiPickerTracker extends BaseWifiTracker {
     // NetworkRequestEntry representing a network that was connected through the NetworkRequest API
     private NetworkRequestEntry mNetworkRequestEntry;
 
+    private NetworkInfo mCurrentNetworkInfo;
     // Cache containing saved WifiConfigurations mapped by StandardWifiEntry key
     private final Map<String, WifiConfiguration> mWifiConfigCache = new HashMap<>();
     // Cache containing suggested WifiConfigurations mapped by StandardWifiEntry key
@@ -192,7 +193,8 @@ public class WifiPickerTracker extends BaseWifiTracker {
         conditionallyUpdateScanResults(true /* lastScanSucceeded */);
         final WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
         final Network currentNetwork = mWifiManager.getCurrentNetwork();
-        updateConnectionInfo(wifiInfo, mConnectivityManager.getNetworkInfo(currentNetwork));
+        mCurrentNetworkInfo = mConnectivityManager.getNetworkInfo(currentNetwork);
+        updateConnectionInfo(wifiInfo, mCurrentNetworkInfo);
         handleLinkPropertiesChanged(mConnectivityManager.getLinkProperties(currentNetwork));
         notifyOnNumSavedNetworksChanged();
         notifyOnNumSavedSubscriptionsChanged();
@@ -218,7 +220,6 @@ public class WifiPickerTracker extends BaseWifiTracker {
     @WorkerThread
     @Override
     protected void handleConfiguredNetworksChangedAction(@NonNull Intent intent) {
-        // TODO(b/70983952): Handle Passpoint configurations here
         checkNotNull(intent, "Intent cannot be null!");
 
         final WifiConfiguration config =
@@ -246,9 +247,8 @@ public class WifiPickerTracker extends BaseWifiTracker {
     protected void handleNetworkStateChangedAction(@NonNull Intent intent) {
         checkNotNull(intent, "Intent cannot be null!");
         final WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
-        final NetworkInfo networkInfo =
-                (NetworkInfo) intent.getExtra(WifiManager.EXTRA_NETWORK_INFO);
-        updateConnectionInfo(wifiInfo, networkInfo);
+        mCurrentNetworkInfo = (NetworkInfo) intent.getExtra(WifiManager.EXTRA_NETWORK_INFO);
+        updateConnectionInfo(wifiInfo, mCurrentNetworkInfo);
         updateWifiEntries();
     }
 
@@ -257,9 +257,7 @@ public class WifiPickerTracker extends BaseWifiTracker {
     protected void handleRssiChangedAction() {
         if (mConnectedWifiEntry != null) {
             final WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
-            final NetworkInfo networkInfo = mConnectivityManager.getNetworkInfo(
-                    mWifiManager.getCurrentNetwork());
-            mConnectedWifiEntry.updateConnectionInfo(wifiInfo, networkInfo);
+            mConnectedWifiEntry.updateConnectionInfo(wifiInfo, mCurrentNetworkInfo);
         }
     }
 
@@ -320,13 +318,6 @@ public class WifiPickerTracker extends BaseWifiTracker {
                             || connectedState == CONNECTED_STATE_CONNECTING;
                 }).findAny().orElse(null /* other */);
             }
-            if (mConnectedWifiEntry == null) {
-                mConnectedWifiEntry = mOsuWifiEntryCache.values().stream().filter(entry -> {
-                    final @WifiEntry.ConnectedState int connectedState = entry.getConnectedState();
-                    return connectedState == CONNECTED_STATE_CONNECTED
-                            || connectedState == CONNECTED_STATE_CONNECTING;
-                }).findAny().orElse(null /* other */);
-            }
             if (mConnectedWifiEntry == null && mNetworkRequestEntry != null
                     && mNetworkRequestEntry.getConnectedState() != CONNECTED_STATE_DISCONNECTED) {
                 mConnectedWifiEntry = mNetworkRequestEntry;
@@ -356,7 +347,8 @@ public class WifiPickerTracker extends BaseWifiTracker {
             mWifiEntries.addAll(mPasspointWifiEntryCache.values().stream().filter(entry ->
                     entry.getConnectedState() == CONNECTED_STATE_DISCONNECTED).collect(toList()));
             mWifiEntries.addAll(mOsuWifiEntryCache.values().stream().filter(entry ->
-                    entry.getConnectedState() == CONNECTED_STATE_DISCONNECTED).collect(toList()));
+                    entry.getConnectedState() == CONNECTED_STATE_DISCONNECTED
+                            && !entry.isAlreadyProvisioned()).collect(toList()));
             Collections.sort(mWifiEntries);
             if (isVerboseLoggingEnabled()) {
                 Log.v(TAG, "Connected WifiEntry: " + mConnectedWifiEntry);
@@ -508,9 +500,9 @@ public class WifiPickerTracker extends BaseWifiTracker {
 
         Map<OsuProvider, List<ScanResult>> osuProviderToScans =
                 mWifiManager.getMatchingOsuProviders(scanResults);
-        Set<OsuProvider> alreadyProvisioned =
-                mWifiManager.getMatchingPasspointConfigsForOsuProviders(osuProviderToScans.keySet())
-                        .keySet();
+        Map<OsuProvider, PasspointConfiguration> osuProviderToPasspointConfig =
+                mWifiManager.getMatchingPasspointConfigsForOsuProviders(
+                        osuProviderToScans.keySet());
         // Update each OsuWifiEntry with new scans (or empty scans).
         for (OsuWifiEntry entry : mOsuWifiEntryCache.values()) {
             entry.updateScanResultInfo(osuProviderToScans.remove(entry.getOsuProvider()));
@@ -524,10 +516,27 @@ public class WifiPickerTracker extends BaseWifiTracker {
             mOsuWifiEntryCache.put(osuProviderToOsuWifiEntryKey(provider), newEntry);
         }
 
-        // Remove entries that are now unreachable or already provisioned
+        // Pass a reference of each OsuWifiEntry to any matching provisioned PasspointWifiEntries
+        // for expiration handling.
+        mOsuWifiEntryCache.values().forEach(osuEntry -> {
+            PasspointConfiguration provisionedConfig =
+                    osuProviderToPasspointConfig.get(osuEntry.getOsuProvider());
+            if (provisionedConfig == null) {
+                osuEntry.setAlreadyProvisioned(false);
+                return;
+            }
+            osuEntry.setAlreadyProvisioned(true);
+            PasspointWifiEntry provisionedEntry = mPasspointWifiEntryCache.get(
+                    uniqueIdToPasspointWifiEntryKey(provisionedConfig.getUniqueId()));
+            if (provisionedEntry == null) {
+                return;
+            }
+            provisionedEntry.setOsuWifiEntry(osuEntry);
+        });
+
+        // Remove entries that are now unreachable
         mOsuWifiEntryCache.entrySet()
-                .removeIf(entry -> entry.getValue().getLevel() == WIFI_LEVEL_UNREACHABLE
-                        || alreadyProvisioned.contains(entry.getValue().getOsuProvider()));
+                .removeIf(entry -> entry.getValue().getLevel() == WIFI_LEVEL_UNREACHABLE);
     }
 
     @WorkerThread

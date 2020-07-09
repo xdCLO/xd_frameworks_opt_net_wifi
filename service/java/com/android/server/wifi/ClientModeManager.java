@@ -40,7 +40,6 @@ import android.telephony.AccessNetworkConstants;
 import android.telephony.CarrierConfigManager;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
-import android.telephony.TelephonyManager;
 import android.telephony.SubscriptionInfo;
 import android.telephony.ims.ImsException;
 import android.telephony.ims.ImsMmTelManager;
@@ -82,9 +81,9 @@ public class ClientModeManager implements ActiveModeManager {
 
     private String mClientInterfaceName;
     private boolean mIfaceIsUp = false;
-    private @Role int mRole = ROLE_UNSPECIFIED;
     private DeferStopHandler mDeferStopHandler;
-    private int mTargetRole = ROLE_UNSPECIFIED;
+    private @Role int mRole = ROLE_UNSPECIFIED;
+    private @Role int mTargetRole = ROLE_UNSPECIFIED;
     private int mActiveSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 
     ClientModeManager(Context context, @NonNull Looper looper, Clock clock, WifiNative wifiNative,
@@ -126,6 +125,11 @@ public class ClientModeManager implements ActiveModeManager {
                     WifiManager.WIFI_STATE_ENABLING);
         }
         mDeferStopHandler.start(getWifiOffDeferringTimeMs());
+    }
+
+    @Override
+    public boolean isStopping() {
+        return mTargetRole == ROLE_UNSPECIFIED && mRole != ROLE_UNSPECIFIED;
     }
 
     private class DeferStopHandler extends WifiHandler {
@@ -286,11 +290,13 @@ public class ClientModeManager implements ActiveModeManager {
         SubscriptionManager subscriptionManager = (SubscriptionManager) mContext.getSystemService(
                 Context.TELEPHONY_SUBSCRIPTION_SERVICE);
         if (subscriptionManager == null) {
+            Log.d(TAG, "SubscriptionManager not found");
             return 0;
         }
 
         List<SubscriptionInfo> subInfoList = subscriptionManager.getActiveSubscriptionInfoList();
         if (subInfoList == null) {
+            Log.d(TAG, "Active SubscriptionInfo list not found");
             return 0;
         }
 
@@ -308,6 +314,7 @@ public class ClientModeManager implements ActiveModeManager {
 
     private int getWifiOffDeferringTimeMs(int subId) {
         if (subId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+            Log.d(TAG, "Invalid Subscription ID: " + subId);
             return 0;
         }
 
@@ -316,15 +323,7 @@ public class ClientModeManager implements ActiveModeManager {
         if (!imsMmTelManager.isAvailable(
                     MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VOICE,
                     ImsRegistrationImplBase.REGISTRATION_TECH_IWLAN)) {
-            return 0;
-        }
-
-        TelephonyManager defaultVoiceTelephonyManager =
-                mContext.getSystemService(TelephonyManager.class)
-                        .createForSubscriptionId(subId);
-        // if LTE is available, no delay needed as IMS will be registered over LTE
-        if (defaultVoiceTelephonyManager.getVoiceNetworkType()
-                == TelephonyManager.NETWORK_TYPE_LTE) {
+            Log.d(TAG, "IMS not registered over IWLAN for subId: " + subId);
             return 0;
         }
 

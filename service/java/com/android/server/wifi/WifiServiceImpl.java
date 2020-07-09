@@ -28,7 +28,7 @@ import static android.net.wifi.WifiManager.WIFI_AP_STATE_ENABLING;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_FAILED;
 
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_VERBOSE_LOGGING_ENABLED;
-
+import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_COVERAGE_EXTEND_FEATURE_ENABLED;
 import android.annotation.CheckResult;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -51,7 +51,6 @@ import android.net.Network;
 import android.net.NetworkStack;
 import android.net.Uri;
 import android.net.ip.IpClientUtil;
-import android.net.shared.Inet4AddressUtils;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IDppCallback;
 import android.net.wifi.ILocalOnlyHotspotCallback;
@@ -112,6 +111,7 @@ import android.util.MutableBoolean;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.AsyncChannel;
+import com.android.net.module.util.Inet4AddressUtils;
 import com.android.server.wifi.hotspot2.PasspointManager;
 import com.android.server.wifi.hotspot2.PasspointProvider;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.UserActionEvent;
@@ -1534,12 +1534,20 @@ public class WifiServiceImpl extends BaseWifiService {
 
         @GuardedBy("mLocalOnlyHotspotRequests")
         private void startForFirstRequestLocked(LocalOnlyHotspotRequestInfo request) {
-            boolean is5Ghz = hasAutomotiveFeature(mContext)
-                    && mContext.getResources().getBoolean(
-                    R.bool.config_wifi_local_only_hotspot_5ghz)
-                    && is5GhzBandSupportedInternal();
+            int band = SoftApConfiguration.BAND_2GHZ;
 
-            int band = is5Ghz ? SoftApConfiguration.BAND_5GHZ : SoftApConfiguration.BAND_2GHZ;
+            // For auto only
+            if (hasAutomotiveFeature(mContext)) {
+                if (mContext.getResources().getBoolean(R.bool.config_wifiLocalOnlyHotspot6ghz)
+                        && mContext.getResources().getBoolean(R.bool.config_wifiSoftap6ghzSupported)
+                        && is6GhzBandSupportedInternal()) {
+                    band = SoftApConfiguration.BAND_6GHZ;
+                } else if (mContext.getResources().getBoolean(
+                        R.bool.config_wifi_local_only_hotspot_5ghz)
+                        && is5GhzBandSupportedInternal()) {
+                    band = SoftApConfiguration.BAND_5GHZ;
+                }
+            }
 
             SoftApConfiguration softApConfig = WifiApConfigStore.generateLocalOnlyHotspotConfig(
                     mContext, band, request.getCustomConfig());
@@ -3580,7 +3588,7 @@ public class WifiServiceImpl extends BaseWifiService {
         if (mVerboseLoggingEnabled) {
             mLog.info("getCurrentNetwork uid=%").c(Binder.getCallingUid()).flush();
         }
-        return mClientModeImpl.getCurrentNetwork();
+        return mClientModeImpl.syncGetCurrentNetwork(mClientModeImplChannel);
     }
 
     public static String toHexString(String s) {
@@ -4300,7 +4308,7 @@ public class WifiServiceImpl extends BaseWifiService {
 
     public boolean isWifiCoverageExtendFeatureEnabled() {
         enforceAccessPermission();
-        return mFacade.getIntegerSetting(mContext, Settings.Global.WIFI_COVERAGE_EXTEND_FEATURE_ENABLED, 0) > 0 ;
+        return mWifiInjector.getSettingsConfigStore().get(WIFI_COVERAGE_EXTEND_FEATURE_ENABLED);
     }
 
     public void enableWifiCoverageExtendFeature(boolean enable) {
@@ -4309,7 +4317,7 @@ public class WifiServiceImpl extends BaseWifiService {
         mLog.info("enableWifiCoverageExtendFeature uid=% enable=%")
                 .c(Binder.getCallingUid())
                 .c(enable).flush();
-        mFacade.setIntegerSetting(mContext, Settings.Global.WIFI_COVERAGE_EXTEND_FEATURE_ENABLED, (enable ? 1 : 0));
+         mWifiInjector.getSettingsConfigStore().put(WIFI_COVERAGE_EXTEND_FEATURE_ENABLED, enable);
     }
 
     /**

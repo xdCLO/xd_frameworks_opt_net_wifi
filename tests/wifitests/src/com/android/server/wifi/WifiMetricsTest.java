@@ -441,6 +441,7 @@ public class WifiMetricsTest extends WifiBaseTest {
     private static final int NUM_NETWORK_SUFFICIENT_RECENT_STATS_ONLY = 4;
     private static final int NUM_NETWORK_SUFFICIENT_RECENT_PREV_STATS = 5;
     private static final int NUM_BSSID_SELECTION_DIFFERENT_BETWEEN_FRAMEWORK_FIRMWARE = 3;
+    private static final long WIFI_MAINLINE_MODULE_VERSION = 123456L;
 
     /** Number of notifications per "Connect to Network" notification type. */
     private static final int[] NUM_CONNECT_TO_NETWORK_NOTIFICATIONS = {0, 10, 20, 30, 40};
@@ -1010,6 +1011,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         metrics.numNetworkSufficientRecentStatsOnly = NUM_NETWORK_SUFFICIENT_RECENT_STATS_ONLY;
         metrics.numNetworkSufficientRecentPrevStats = NUM_NETWORK_SUFFICIENT_RECENT_PREV_STATS;
         when(mWifiHealthMonitor.buildProto()).thenReturn(metrics);
+        when(mWifiHealthMonitor.getWifiStackVersion()).thenReturn(WIFI_MAINLINE_MODULE_VERSION);
     }
 
     private void addSoftApEventsToMetrics() {
@@ -1412,6 +1414,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 mDecodedProto.numConnectRequestWithFilsAkm);
         assertEquals(NUM_L2_CONNECTION_THROUGH_FILS_AUTHENTICATION,
                 mDecodedProto.numL2ConnectionThroughFilsAuthentication);
+        assertEquals(WIFI_MAINLINE_MODULE_VERSION, mDecodedProto.mainlineModuleVersion);
 
     }
 
@@ -1759,10 +1762,11 @@ public class WifiMetricsTest extends WifiBaseTest {
         assertEquals(1, mDecodedProto.connectionEvent.length);
         assertEquals(WifiMetricsProto.ConnectionEvent.TYPE_OPEN,
                 mDecodedProto.connectionEvent[0].networkType);
+        assertFalse(mDecodedProto.connectionEvent[0].isOsuProvisioned);
     }
 
     /**
-     * Verify the ConnectionEvent is labeled with networkType passpoint correctly.
+     * Verify the ConnectionEvent is labeled with networkType Passpoint correctly.
      */
     @Test
     public void testConnectionNetworkTypePasspoint() throws Exception {
@@ -1778,6 +1782,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         assertEquals(1, mDecodedProto.connectionEvent.length);
         assertEquals(WifiMetricsProto.ConnectionEvent.TYPE_PASSPOINT,
                 mDecodedProto.connectionEvent[0].networkType);
+        assertFalse(mDecodedProto.connectionEvent[0].isOsuProvisioned);
     }
 
     /**
@@ -1944,10 +1949,10 @@ public class WifiMetricsTest extends WifiBaseTest {
     }
 
     /**
-     * Test logging to WestWorld when a connection event finishes.
+     * Test logging to statsd when a connection event finishes.
      */
     @Test
-    public void testLogWifiConnectionResultWestworld() throws Exception {
+    public void testLogWifiConnectionResultStatsd() throws Exception {
         // static mocking for WifiStatsLog
         mSession = ExtendedMockito.mockitoSession()
                 .strictness(Strictness.LENIENT)
@@ -4991,5 +4996,27 @@ public class WifiMetricsTest extends WifiBaseTest {
         assertEquals(1, mDecodedProto.carrierWifiMetrics.numConnectionSuccess);
         assertEquals(2, mDecodedProto.carrierWifiMetrics.numConnectionAuthFailure);
         assertEquals(3, mDecodedProto.carrierWifiMetrics.numConnectionNonAuthFailure);
+    }
+
+    /**
+     * Verify the ConnectionEvent is labeled with networkType Passpoint correctly and that the OSU
+     * provisioned flag is set to true.
+     */
+    @Test
+    public void testConnectionNetworkTypePasspointFromOsu() throws Exception {
+        WifiConfiguration config = WifiConfigurationTestUtil.createPasspointNetwork();
+        config.updateIdentifier = "7";
+        mWifiMetrics.startConnectionEvent(config, "RED",
+                WifiMetricsProto.ConnectionEvent.ROAM_NONE);
+        mWifiMetrics.endConnectionEvent(
+                WifiMetrics.ConnectionEvent.FAILURE_ASSOCIATION_TIMED_OUT,
+                WifiMetricsProto.ConnectionEvent.HLF_NONE,
+                WifiMetricsProto.ConnectionEvent.FAILURE_REASON_UNKNOWN);
+        dumpProtoAndDeserialize();
+
+        assertEquals(1, mDecodedProto.connectionEvent.length);
+        assertEquals(WifiMetricsProto.ConnectionEvent.TYPE_PASSPOINT,
+                mDecodedProto.connectionEvent[0].networkType);
+        assertTrue(mDecodedProto.connectionEvent[0].isOsuProvisioned);
     }
 }

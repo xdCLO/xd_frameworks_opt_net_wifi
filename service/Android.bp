@@ -15,7 +15,7 @@
 //
 java_defaults {
     name: "wifi-service-common",
-    min_sdk_version: "29",
+    defaults: ["wifi-module-sdk-version-defaults"],
     errorprone: {
         javacflags: ["-Xep:CheckReturnValue:ERROR"],
     },
@@ -62,7 +62,8 @@ java_library {
         // need pre-jarjar symbols so that wifi-service can reference the original class names at
         // compile time
         "framework-wifi-pre-jarjar",
-        "framework-statsd-stubs-module_libs_api",
+        "framework-statsd.stubs.module_lib",
+        "framework-tethering.stubs.module_lib",
         "unsupportedappusage",
     ],
 
@@ -82,6 +83,7 @@ java_library {
         "android.hidl.manager-V1.2-java",
         "vendor.qti.hardware.wifi.hostapd-V1.0-java",
         "vendor.qti.hardware.wifi.hostapd-V1.1-java",
+        "vendor.qti.hardware.wifi.hostapd-V1.2-java",
         "vendor.qti.hardware.wifi.supplicant-V2.0-java",
         "vendor.qti.hardware.wifi.supplicant-V2.1-java",
         "androidx.annotation_annotation",
