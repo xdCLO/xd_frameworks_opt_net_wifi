@@ -352,10 +352,16 @@ public class SoftApManager implements ActiveModeManager {
             return SUCCESS;
         }
 
-        // We're configuring a random/custom MAC address. In this case, driver support is mandatory.
-        if (!mWifiNative.setMacAddress(mApInterfaceName, mac)) {
-            Log.e(TAG, "failed to set explicitly requested MAC address");
-            return ERROR_GENERIC;
+
+        if (mWifiNative.isSetMacAddressSupported(mApInterfaceName)) {
+            if (!mWifiNative.setMacAddress(mApInterfaceName, mac)) {
+                Log.e(TAG, "failed to set explicitly requested MAC address");
+                return ERROR_GENERIC;
+            }
+        } else if (!mIsRandomizeBssid) {
+            // If hardware does not support MAC address setter,
+            // only report the error for non randomization.
+            return ERROR_UNSUPPORTED_CONFIGURATION;
         }
         return SUCCESS;
     }
@@ -363,9 +369,9 @@ public class SoftApManager implements ActiveModeManager {
     private int setCountryCode() {
         int band = mApConfig.getSoftApConfiguration().getBand();
         if (TextUtils.isEmpty(mCountryCode)) {
-            if (band == SoftApConfiguration.BAND_5GHZ) {
+            if (band == SoftApConfiguration.BAND_5GHZ || band == SoftApConfiguration.BAND_6GHZ) {
                 // Country code is mandatory for 5GHz band.
-                Log.e(TAG, "Invalid country code, required for setting up soft ap in 5GHz");
+                Log.e(TAG, "Invalid country code, required for setting up soft ap in 5GHz/6GHz");
                 return ERROR_GENERIC;
             }
             // Absence of country code is not fatal for 2Ghz & Any band options.
@@ -374,10 +380,10 @@ public class SoftApManager implements ActiveModeManager {
 
         if (!mWifiNative.setCountryCodeHal(
                 mApInterfaceName, mCountryCode.toUpperCase(Locale.ROOT))) {
-            if (band == SoftApConfiguration.BAND_5GHZ) {
+            if (band == SoftApConfiguration.BAND_5GHZ || band == SoftApConfiguration.BAND_6GHZ) {
                 // Return an error if failed to set country code when AP is configured for
                 // 5GHz band.
-                Log.e(TAG, "Failed to set country code, required for setting up soft ap in 5GHz");
+                Log.e(TAG, "Failed to set country code, required for setting up soft ap in 5GHz/6GHz");
                 return ERROR_GENERIC;
             }
             // Failure to set country code is not fatal for other band options.
