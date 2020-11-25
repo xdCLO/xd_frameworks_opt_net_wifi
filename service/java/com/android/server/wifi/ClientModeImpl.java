@@ -30,6 +30,7 @@ import static android.net.wifi.WifiManager.WIFI_STATE_UNKNOWN;
 import static android.net.wifi.WifiManager.STA_PRIMARY;
 import static com.android.server.wifi.WifiDataStall.INVALID_THROUGHPUT;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_WHITELIST_ROAMING_ENABLED;
+import static com.android.server.wifi.WifiSettingsConfigStore.HW_SUPPORTED_FEATURES;
 
 
 import android.annotation.IntDef;
@@ -269,6 +270,7 @@ public class ClientModeImpl extends StateMachine {
     // The subId used by WifiConfiguration with SIM credential which was connected successfully
     private int mLastSubId;
     private String mLastSimBasedConnectionCarrierName;
+    private String mConcurrentBand = null;
 
     private boolean mIpReachabilityDisconnectEnabled = true;
 
@@ -4011,6 +4013,12 @@ public class ClientModeImpl extends StateMachine {
             if (mClientModeCallback != null) {
                  mClientModeCallback.onStarted();
             }
+            mConcurrentBand = mWifiNative.doDriverCmd(mInterfaceName,
+                "GET_DRIVER_SUPPORTED_FEATURES");
+            Log.d(TAG, "output of doDriverCmd for concurrent band = " + mConcurrentBand);
+            if (mConcurrentBand != null)
+                mWifiInjector.getSettingsConfigStore().put(HW_SUPPORTED_FEATURES,
+                    Integer.parseInt(mConcurrentBand));
         }
 
         @Override
