@@ -66,8 +66,8 @@ import java.util.List;
  * Manager WiFi in Client Mode where we connect to configured networks.
  */
 public class ClientModeManager implements ActiveModeManager {
-    private static final String TAG = "WifiClientModeManager";
-
+    private static String TAG = "WifiClientModeManager";
+    private static int TAG_COUNT = 0;
     private final ClientModeStateMachine mStateMachine;
 
     private final Context mContext;
@@ -99,6 +99,7 @@ public class ClientModeManager implements ActiveModeManager {
         mClientModeImpl = clientModeImpl;
         mStateMachine = new ClientModeStateMachine(looper);
         mDeferStopHandler = new DeferStopHandler(TAG, looper);
+        TAG = "WifiClientModeManager" + TAG_COUNT++;
     }
 
     /**
@@ -106,6 +107,8 @@ public class ClientModeManager implements ActiveModeManager {
      */
     @Override
     public void start() {
+        Log.d(TAG, "Starting with role ROLE_CLIENT_SCAN_ONLY");
+        mRole = ROLE_CLIENT_SCAN_ONLY;
         mTargetRole = ROLE_CLIENT_SCAN_ONLY;
         mStateMachine.sendMessage(ClientModeStateMachine.CMD_START);
     }
@@ -141,6 +144,8 @@ public class ClientModeManager implements ActiveModeManager {
         private long mDeferringStartTimeMillis = 0;
         private NetworkRequest mImsRequest = null;
         private ConnectivityManager mConnectivityManager = null;
+        private boolean mIsImsNetworkLost = false;
+        private boolean mIsImsNetworkUnregistered = false;
 
         private RegistrationManager.RegistrationCallback mImsRegistrationCallback =
                 new RegistrationManager.RegistrationCallback() {
@@ -157,7 +162,8 @@ public class ClientModeManager implements ActiveModeManager {
                     @Override
                     public void onUnregistered(ImsReasonInfo imsReasonInfo) {
                         Log.d(TAG, "on IMS unregistered");
-                        // Wait for onLost in NetworkCallback
+                        mIsImsNetworkUnregistered = true;
+                        checkAndContinueToStopWifi();
                     }
                 };
 
@@ -184,7 +190,8 @@ public class ClientModeManager implements ActiveModeManager {
                         int delay = mContext.getResources()
                                 .getInteger(R.integer.config_wifiDelayDisconnectOnImsLostMs);
                         if (delay == 0 || !postDelayed(mRunnable, delay)) {
-                            continueToStopWifi();
+                            mIsImsNetworkLost = true;
+                            checkAndContinueToStopWifi();
                         }
                     }
                 }
@@ -239,6 +246,11 @@ public class ClientModeManager implements ActiveModeManager {
                                                          new Handler(mLooper));
         }
 
+        private void checkAndContinueToStopWifi() {
+            if (mIsImsNetworkLost && mIsImsNetworkUnregistered)
+                continueToStopWifi();
+        }
+
         private void continueToStopWifi() {
             Log.d(TAG, "The target role " + mTargetRole);
 
@@ -280,6 +292,8 @@ public class ClientModeManager implements ActiveModeManager {
             }
 
             mIsDeferring = false;
+            mIsImsNetworkLost = false;
+            mIsImsNetworkUnregistered = false;
         }
     }
 
@@ -320,13 +334,17 @@ public class ClientModeManager implements ActiveModeManager {
 
         ImsMmTelManager imsMmTelManager = ImsMmTelManager.createForSubscriptionId(subId);
         // If no wifi calling, no delay
-        if (!imsMmTelManager.isAvailable(
+        try {
+            if (!imsMmTelManager.isAvailable(
                     MmTelFeature.MmTelCapabilities.CAPABILITY_TYPE_VOICE,
                     ImsRegistrationImplBase.REGISTRATION_TECH_IWLAN)) {
-            Log.d(TAG, "IMS not registered over IWLAN for subId: " + subId);
+                Log.d(TAG, "IMS not registered over IWLAN for subId: " + subId);
+                return 0;
+            }
+        } catch (RuntimeException e) {
+            Log.e(TAG, "IMS Manager is not available.", e);
             return 0;
         }
-
         CarrierConfigManager configManager =
                 (CarrierConfigManager) mContext.getSystemService(Context.CARRIER_CONFIG_SERVICE);
         PersistableBundle config = configManager.getConfigForSubId(subId);
@@ -412,10 +430,25 @@ public class ClientModeManager implements ActiveModeManager {
         public static final int CMD_INTERFACE_DESTROYED = 4;
         public static final int CMD_INTERFACE_DOWN = 5;
         public static final int CMD_SWITCH_TO_SCAN_ONLY_MODE_CONTINUE = 6;
+        public static final int CMD_CONNECT_MODE_READY = 10;
+
         private final State mIdleState = new IdleState();
         private final State mStartedState = new StartedState();
         private final State mScanOnlyModeState = new ScanOnlyModeState();
         private final State mConnectModeState = new ConnectModeState();
+
+        private final Listener mClientModeImplListener = new Listener() {
+            @Override
+            public void onStarted() {
+                sendMessage(CMD_CONNECT_MODE_READY);
+            }
+
+            @Override
+            public void onStopped() {}
+
+            @Override
+            public void onStartFailure() {};
+        };
 
         private final InterfaceCallback mWifiNativeInterfaceCallback = new InterfaceCallback() {
             @Override
@@ -621,19 +654,23 @@ public class ClientModeManager implements ActiveModeManager {
             @Override
             public void enter() {
                 Log.d(TAG, "entering ConnectModeState");
+                mClientModeImpl.registerModeListener(mClientModeImplListener);
                 mClientModeImpl.setOperationalMode(ClientModeImpl.CONNECT_MODE,
                         mClientInterfaceName);
-                mModeListener.onStarted();
-                updateConnectModeState(WifiManager.WIFI_STATE_ENABLED,
-                        WifiManager.WIFI_STATE_ENABLING);
-
-                // Inform sar manager that wifi is Enabled
-                mSarManager.setClientWifiState(WifiManager.WIFI_STATE_ENABLED);
             }
 
             @Override
             public boolean processMessage(Message message) {
                 switch (message.what) {
+                    case CMD_CONNECT_MODE_READY:
+                        Log.d(TAG, "ConnectMode is ready");
+                        mModeListener.onStarted();
+                        updateConnectModeState(WifiManager.WIFI_STATE_ENABLED,
+                                WifiManager.WIFI_STATE_ENABLING);
+
+                        // Inform sar manager that wifi is Enabled
+                        mSarManager.setClientWifiState(WifiManager.WIFI_STATE_ENABLED);
+                        break;
                     case CMD_SWITCH_TO_CONNECT_MODE:
                         int newRole = message.arg1;
                         // Already in connect mode, only switching the connectivity roles.
