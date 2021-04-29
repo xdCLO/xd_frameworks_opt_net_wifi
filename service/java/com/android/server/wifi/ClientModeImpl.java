@@ -4016,7 +4016,7 @@ public class ClientModeImpl extends StateMachine {
             mConcurrentBand = mWifiNative.doDriverCmd(mInterfaceName,
                 "GET_DRIVER_SUPPORTED_FEATURES");
             Log.d(TAG, "output of doDriverCmd for concurrent band = " + mConcurrentBand);
-            if (mConcurrentBand != null)
+            if (!TextUtils.isEmpty(mConcurrentBand))
                 mWifiInjector.getSettingsConfigStore().put(HW_SUPPORTED_FEATURES,
                     Integer.parseInt(mConcurrentBand));
         }
