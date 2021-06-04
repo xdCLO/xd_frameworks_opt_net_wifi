@@ -113,6 +113,12 @@ public class WifiSettingsConfigStore {
      */
     public static final Key<Boolean> WIFI_NEW_NETWORK_AUTO_CONNECTION_ENABLED =
             new Key<>("wifi_new_network_auto_connection_enabled", true);
+    /**
+     * Concurrent network session support
+     */
+    public static final Key<Integer> HW_SUPPORTED_FEATURES =
+            new Key<>("hw_supported_features", 0);
+
 
    /******** Wifi shared pref keys ***************/
 
