@@ -35,6 +35,7 @@ import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_VERBOSE_LOGGI
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_COVERAGE_EXTEND_FEATURE_ENABLED;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_WHITELIST_ROAMING_ENABLED;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NEW_NETWORK_AUTO_CONNECTION_ENABLED;
+import static com.android.server.wifi.WifiSettingsConfigStore.HW_SUPPORTED_FEATURES;
 import android.annotation.CheckResult;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -4529,6 +4530,12 @@ public class WifiServiceImpl extends BaseWifiService {
     private void enableSoftApBeaconProtFeatureInternal(boolean enable) {
         mWifiInjector.getSettingsConfigStore().put(SOFTAP_BEACON_PROTECTION_ENABLED, enable);
         mClientModeImpl.enableSoftApBeaconProtFeature(enable);
+    }
+
+    @Override
+    public int isConcurrentBandSupported() {
+        enforceAccessPermission();
+        return mWifiInjector.getSettingsConfigStore().get(HW_SUPPORTED_FEATURES);
     }
 
     /**

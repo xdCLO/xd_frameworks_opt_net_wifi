@@ -726,6 +726,11 @@ public class BaseWifiService extends IWifiManager.Stub {
     }
 
     @Override
+    public int isConcurrentBandSupported(){
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void enableSoftApBeaconProtFeature(boolean enable) {
         throw new UnsupportedOperationException();
     }
