@@ -5998,6 +5998,8 @@ public class ClientModeImpl extends StateMachine {
 
             /** clear the roaming state, if we were roaming, we failed */
             mIsAutoRoaming = false;
+            mTargetNetworkId = WifiConfiguration.INVALID_NETWORK_ID;
+
             mIpReachabilityMonitorActive = false;
             removeMessages(CMD_IP_REACHABILITY_SESSION_END);
 
