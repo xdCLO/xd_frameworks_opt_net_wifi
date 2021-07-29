@@ -195,6 +195,9 @@ abstract class SupplicantStaIfaceCallbackV1_2Impl extends
                 .getNameForUid(Process.WIFI_UID);
         newWifiConfiguration.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
         newWifiConfiguration.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.CCMP);
+        newWifiConfiguration.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
+        newWifiConfiguration.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.GCMP_256);
+        newWifiConfiguration.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.GCMP_256);
         newWifiConfiguration.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
         newWifiConfiguration.status = WifiConfiguration.Status.ENABLED;
 
