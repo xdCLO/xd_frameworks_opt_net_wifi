@@ -251,15 +251,14 @@ abstract class SupplicantStaIfaceCallbackImpl extends ISupplicantStaIfaceCallbac
     public void onDisconnected(byte[/* 6 */] bssid, boolean locallyGenerated, int reasonCode) {
         synchronized (mLock) {
             mStaIfaceHal.logCallback("onDisconnected");
-            if (mStaIfaceHal.isVerboseLoggingEnabled()) {
-                Log.e(TAG, "onDisconnected state=" + mStateBeforeDisconnect
+            Log.i(TAG, "onDisconnected state=" + mStateBeforeDisconnect
                         + " locallyGenerated=" + locallyGenerated
                         + " reasonCode=" + reasonCode);
-            }
             WifiConfiguration curConfiguration =
                     mStaIfaceHal.getCurrentNetworkLocalConfig(mIfaceName);
             if (curConfiguration != null) {
-                if (mStateBeforeDisconnect == State.FOURWAY_HANDSHAKE
+                if ((mStateBeforeDisconnect == State.FOURWAY_HANDSHAKE
+                        || mStateBeforeDisconnect == State.ASSOCIATED)
                         && WifiConfigurationUtil.isConfigForPskNetwork(curConfiguration)
                         && (!locallyGenerated || reasonCode != ReasonCode.IE_IN_4WAY_DIFFERS)) {
                     mWifiMonitor.broadcastAuthenticationFailureEvent(
