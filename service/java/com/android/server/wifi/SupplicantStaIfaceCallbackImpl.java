@@ -33,6 +33,7 @@ import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiSsid;
 import android.util.Log;
+import android.util.Pair;
 
 import com.android.server.wifi.hotspot2.AnqpEvent;
 import com.android.server.wifi.hotspot2.IconEvent;
@@ -169,6 +170,28 @@ abstract class SupplicantStaIfaceCallbackImpl extends ISupplicantStaIfaceCallbac
             WifiSsid wifiSsid = // wifigbk++
                         WifiGbk.createWifiSsidFromByteArray(NativeUtil.byteArrayFromArrayList(ssid));
             String bssidStr = NativeUtil.macAddressFromByteArray(bssid);
+
+            int currentNetworkId = mStaIfaceHal.getCurrentNetworkRemoteId(mIfaceName);
+            if (currentNetworkId != WifiConfiguration.INVALID_NETWORK_ID
+                    && id != WifiConfiguration.INVALID_NETWORK_ID
+                    && id != currentNetworkId) {
+                Log.i(TAG, "Network id changed, newState = " + newState
+                            + ", SSID = " + wifiSsid + ", bssid = " + bssidStr
+                            + ", reported networkId = " + id
+                            + ", current networkId = " + currentNetworkId);
+                ArrayList<Pair<SupplicantStaNetworkHal, WifiConfiguration>> linkedNetworkHandles =
+                        mStaIfaceHal.getLinkedNetworksHandles(mIfaceName);
+                if (linkedNetworkHandles != null) {
+                    for (Pair<SupplicantStaNetworkHal, WifiConfiguration> pair :
+                                 linkedNetworkHandles) {
+                        if (pair.first.getNetworkId() != id) continue;
+
+                        Log.i(TAG, "make linked network as current network");
+                        mStaIfaceHal.updateCurrentNetworkHandles(mIfaceName, pair);
+                    }
+                }
+            }
+
             if (newState != State.DISCONNECTED) {
                 // onStateChanged(DISCONNECTED) may come before onDisconnected(), so add this
                 // cache to track the state before the disconnect.
