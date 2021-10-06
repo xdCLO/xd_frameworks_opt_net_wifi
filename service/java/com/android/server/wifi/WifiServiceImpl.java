@@ -1084,11 +1084,15 @@ public class WifiServiceImpl extends BaseWifiService {
 
         SoftApConfiguration softApConfig = apConfig.getSoftApConfiguration();
 
-        if (softApConfig == null && TextUtils.isEmpty(mCountryCode.getCountryCode())) {
+        if (softApConfig == null && TextUtils.isEmpty(mCountryCode.getCountryCode())
+                && (mWifiApConfigStore.getApConfiguration().getBand() & SoftApConfiguration.BAND_2GHZ) != 1) {
             Log.d(TAG, "Starting softap without country code. Fallback to 2G band!");
             softApConfig = new SoftApConfiguration.Builder(mWifiApConfigStore.getApConfiguration())
                 .setBand(SoftApConfiguration.BAND_2GHZ).build();
-            mWifiApConfigStore.setApConfiguration(softApConfig);
+
+            // Create a tmp config to make compiler happy about lamda using final variable.
+            final SoftApConfiguration tmpSoftApConfig = new SoftApConfiguration.Builder(softApConfig).build();
+            mWifiThreadRunner.post(() -> mWifiApConfigStore.setApConfiguration(tmpSoftApConfig));
         }
 
         setDualSapMode(softApConfig);
