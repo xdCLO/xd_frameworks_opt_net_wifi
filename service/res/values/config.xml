@@ -487,5 +487,5 @@
     <string name="config_vendor_wifi_tether_bridge_interface_name" translatable="false">wifi_br0</string>
 
     <!-- Boolean to provide support to keep wifi5 symbol for 8SS supported device and 11ax AP -->
-    <bool translatable="false" name="config_vendorWifi11axReadySupport">true</bool>
+    <bool translatable="false" name="config_vendorWifi11axReadySupport">false</bool>
 </resources>
