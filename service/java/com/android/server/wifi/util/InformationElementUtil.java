@@ -918,6 +918,7 @@ public class InformationElementUtil {
         private static final int RSN_AKM_FT_SAE = 0x09ac0f00;
         private static final int RSN_AKM_OWE = 0x12ac0f00;
         private static final int RSN_AKM_EAP_SUITE_B_192 = 0x0cac0f00;
+        private static final int RSN_AKM_FT_EAP_SHA384 = 0x0dac0f00;
         private static final int RSN_OSEN = 0x019a6f50;
         private static final int RSN_AKM_EAP_FILS_SHA256 = 0x0eac0f00;
         private static final int RSN_AKM_EAP_FILS_SHA384 = 0x0fac0f00;
@@ -1026,6 +1027,9 @@ public class InformationElementUtil {
                         case RSN_AKM_EAP_SUITE_B_192:
                             Log.e("informationelement", "captured suite b" );
                             rsnKeyManagement.add(ScanResult.KEY_MGMT_EAP_SUITE_B_192);
+                            break;
+                        case RSN_AKM_FT_EAP_SHA384:
+                            rsnKeyManagement.add(ScanResult.KEY_MGMT_FT_EAP_SHA384);
                             break;
                         case RSN_OSEN:
                             rsnKeyManagement.add(ScanResult.KEY_MGMT_OSEN);
@@ -1317,6 +1321,8 @@ public class InformationElementUtil {
                     return "FT/SAE";
                 case ScanResult.KEY_MGMT_EAP_SUITE_B_192:
                     return "EAP_SUITE_B_192";
+                case ScanResult.KEY_MGMT_FT_EAP_SHA384:
+                    return "FT/EAP_SUITE_B_192";
                 case ScanResult.KEY_MGMT_OSEN:
                     return "OSEN";
                 case ScanResult.KEY_MGMT_WAPI_PSK:
