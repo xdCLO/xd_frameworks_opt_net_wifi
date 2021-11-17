@@ -1238,10 +1238,10 @@ public class SupplicantStaIfaceHal {
      */
     public boolean connectToNetwork(@NonNull String ifaceName, @NonNull WifiConfiguration config) {
         synchronized (mLock) {
-            boolean isMixedGbkUtf = WifiGbk.isMixedGbkUtf(config); // wifigbk++
-            logd("connectToNetwork " + config.getKey() + " isMixedGbkUtf=" + isMixedGbkUtf);
+            int halNetworksSize = 0;
+            logd("connectToNetwork " + config.getKey());
             WifiConfiguration currentConfig = getCurrentNetworkLocalConfig(ifaceName);
-            if (WifiConfigurationUtil.isSameNetwork(config, currentConfig) && !isMixedGbkUtf) {
+            if (WifiConfigurationUtil.isSameNetwork(config, currentConfig)) {
                 String networkSelectionBSSID = config.getNetworkSelectionStatus()
                         .getNetworkSelectionBSSID();
                 String networkSelectionBSSIDCurrent =
@@ -1266,12 +1266,36 @@ public class SupplicantStaIfaceHal {
                     loge("Failed to remove existing networks");
                     return false;
                 }
+                // wifigbk++
+                Pair<SupplicantStaNetworkHal, WifiConfiguration> pair2 = null;
+                try {
+                    // add 1 more gbk config to wpa_supplicant
+                    WifiConfiguration gbkConfig = new WifiConfiguration(config);
+                    gbkConfig.SSID = WifiGbk.toGbkHexSsidOrException(config.SSID);
 
+                    pair2 = addNetworkAndSaveConfig(ifaceName, gbkConfig);
+                    if (pair2 == null) {
+                        logd("Failed to add/save network configuration: " + gbkConfig
+                            .getKey());
+                    } else {
+                        pair2.first.enable(true);
+                        halNetworksSize ++;
+                    }
+                } catch (IllegalArgumentException e) { /* empty */ }
+                // wifigbk--
                 Pair<SupplicantStaNetworkHal, WifiConfiguration> pair =
                         addNetworkAndSaveConfig(ifaceName, config);
                 if (pair == null) {
-                    loge("Failed to add/save network configuration: " + config.getKey());
-                    return false;
+                    logd("Failed to add/save network configuration: " + config.getKey());
+                    // wifigbk++
+                    if (pair2 == null) {
+                        return false;
+                    }
+                    pair = pair2;
+                } else {
+                    pair.first.enable(true);
+                    halNetworksSize ++;
+                    // wifigbk--
                 }
                 mCurrentNetworkRemoteHandles.put(ifaceName, pair.first);
                 mCurrentNetworkLocalConfigs.put(ifaceName, pair.second);
@@ -1294,9 +1318,18 @@ public class SupplicantStaIfaceHal {
                 }
             }
 
-            if (!networkHandle.select()) {
-                loge("Failed to select network configuration: " + config.getKey());
-                return false;
+            // wifgbk++
+            if (halNetworksSize == 2) {
+                if (!reconnect(ifaceName)) {
+                    loge("Failed to reconnect network configuration: " + config.getKey());
+                    return false;
+                }
+            } else {
+            // wifigbk--
+                if (!networkHandle.select()) {
+                    loge("Failed to select network configuration: " + config.getKey());
+                    return false;
+                }
             }
             return true;
         }
