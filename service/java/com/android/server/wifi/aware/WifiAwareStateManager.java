@@ -230,6 +230,8 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
 
     private static final byte[] ALL_ZERO_MAC = new byte[] {0, 0, 0, 0, 0, 0};
     private byte[] mCurrentDiscoveryInterfaceMac = ALL_ZERO_MAC;
+    private final static int MAX_RETRY_COUNT_GETAWARE = 5;
+    private static int mRetryAwarequery = 0;
 
     public WifiAwareStateManager() {
         onReset();
@@ -2486,10 +2488,11 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
     private void enableUsageLocal() {
         if (mDbg) Log.v(TAG, "enableUsageLocal: mUsageEnabled=" + mUsageEnabled);
 
-        if (mCapabilities == null) {
+        if (mCapabilities == null && mRetryAwarequery <= MAX_RETRY_COUNT_GETAWARE) {
             getAwareInterface();
             queryCapabilities();
             releaseAwareInterface();
+            mRetryAwarequery++;
         }
 
         if (mUsageEnabled) {
