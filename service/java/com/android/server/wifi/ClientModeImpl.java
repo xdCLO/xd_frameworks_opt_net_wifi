@@ -6033,6 +6033,7 @@ public class ClientModeImpl extends StateMachine {
                                         WifiLastResortWatchdog.FAILURE_CODE_AUTHENTICATION);
                     }
                     clearNetworkCachedDataIfNeeded(getTargetWifiConfiguration(), message.arg2);
+                    mWifiNative.qtiUpdateConnectedBand(STA_PRIMARY, WifiNative.ConnectedBand.BAND_NONE);
                     mTargetNetworkId = WifiConfiguration.INVALID_NETWORK_ID;
                     mWifiInfo.reset();
                     break;
@@ -7172,7 +7173,8 @@ public class ClientModeImpl extends StateMachine {
 
     public List<ScanDetail> qtiGetFilteredScan(List<ScanDetail> scanDetails) {
         // All Bands are available for use
-        if (mWifiNative.qtiConnectedbands.get(WifiNative.ConnectedBand.BAND_NONE))
+        if (!mWifiNative.isDualStaSupported() ||
+                mWifiNative.qtiConnectedbands.get(WifiNative.ConnectedBand.BAND_NONE))
             return scanDetails;
 
         boolean filter2G = false;
