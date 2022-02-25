@@ -1297,6 +1297,7 @@ public class SupplicantStaIfaceHal {
                     halNetworksSize ++;
                     // wifigbk--
                 }
+                pair.first.setHalNetworksSize(halNetworksSize);
                 mCurrentNetworkRemoteHandles.put(ifaceName, pair.first);
                 mCurrentNetworkLocalConfigs.put(ifaceName, pair.second);
             }
@@ -4288,6 +4289,12 @@ public class SupplicantStaIfaceHal {
 
             if (!currentHandle.getId()) {
                 Log.e(TAG, "current network getId failed");
+                return false;
+            }
+
+            if (currentHandle.getHalNetworksSize() == 2) {
+                Log.i(TAG, "no need to clear linked networks if both UTF-8 and GBK " +
+                        "encoding network profiles are added to supplicant");
                 return false;
             }
 
