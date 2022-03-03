@@ -2188,7 +2188,7 @@ public class WifiMetricsTest extends WifiBaseTest {
     private static final int DEAUTH_REASON = 7;
     private static final int ASSOC_STATUS = 11;
     private static final int ASSOC_TIMEOUT = 1;
-    private static final int LOCAL_GEN = 1;
+    private static final boolean LOCAL_GEN = true;
     private static final int AUTH_FAILURE_REASON = WifiManager.ERROR_AUTH_FAILURE_WRONG_PSWD;
     private static final int NUM_TEST_STA_EVENTS = 19;
     private static final String   sSSID = "\"SomeTestSsid\"";
@@ -2210,7 +2210,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         {WifiMonitor.ASSOCIATION_REJECTION_EVENT,   ASSOC_TIMEOUT,       ASSOC_STATUS},
         {WifiMonitor.AUTHENTICATION_FAILURE_EVENT,  AUTH_FAILURE_REASON, -1},
         {WifiMonitor.NETWORK_CONNECTION_EVENT,      0,                   0},
-        {WifiMonitor.NETWORK_DISCONNECTION_EVENT,   LOCAL_GEN,           DEAUTH_REASON},
+        {WifiMonitor.NETWORK_DISCONNECTION_EVENT,   0,                   0},
         {WifiMonitor.SUPPLICANT_STATE_CHANGE_EVENT, 0,                   0},
         {WifiMonitor.ASSOCIATED_BSSID_EVENT,        0,                   0},
         {WifiMonitor.TARGET_BSSID_EVENT,            0,                   0},
@@ -2221,7 +2221,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         null,
         null,
         null,
-        null,
+        new DisconnectEventInfo(sSSID, sBSSID, DEAUTH_REASON, LOCAL_GEN),
         mStateDisconnected,
         null,
         null,
@@ -2255,7 +2255,7 @@ public class WifiMetricsTest extends WifiBaseTest {
             /**/StaEvent.AUTH_FAILURE_WRONG_PSWD,             0,        0, 0},    /**/
         {StaEvent.TYPE_NETWORK_CONNECTION_EVENT,        -1,            -1,         0,
             /**/                               0,             0,        0, 0},    /**/
-        {StaEvent.TYPE_NETWORK_DISCONNECTION_EVENT, DEAUTH_REASON,     -1, LOCAL_GEN,
+        {StaEvent.TYPE_NETWORK_DISCONNECTION_EVENT, DEAUTH_REASON,     -1, LOCAL_GEN ? 1 : 0,
             /**/                               0,             0,        0, 0},    /**/
         {StaEvent.TYPE_CMD_ASSOCIATED_BSSID,            -1,            -1,         0,
             /**/                               0,             0,  mSupBm1, 0},    /**/
