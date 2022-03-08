@@ -4806,8 +4806,9 @@ public class WifiMetrics {
                 break;
             case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
                 event.type = StaEvent.TYPE_NETWORK_DISCONNECTION_EVENT;
-                event.reason = msg.arg2;
-                event.localGen = msg.arg1 == 0 ? false : true;
+                DisconnectEventInfo disconnectEventInfo = (DisconnectEventInfo) msg.obj;
+                event.reason = disconnectEventInfo.reasonCode;
+                event.localGen = disconnectEventInfo.locallyGenerated;
                 break;
             case WifiMonitor.SUPPLICANT_STATE_CHANGE_EVENT:
                 logEvent = false;
