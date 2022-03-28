@@ -260,6 +260,8 @@ public class ClientModeImpl extends StateMachine {
 
     private boolean mScreenOn = false;
 
+    private boolean newConnectionInProgress = false;
+
     private String mInterfaceName;
     /* The interface for ipClient */
     private String mDataInterfaceName;
@@ -2148,10 +2150,8 @@ public class ClientModeImpl extends StateMachine {
                 break;
             case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
                 if (msg.obj != null) {
-                    sb.append(" ").append((String) msg.obj);
+                    sb.append(" ").append((DisconnectEventInfo) msg.obj);
                 }
-                sb.append(" nid=").append(msg.arg1);
-                sb.append(" reason=").append(msg.arg2);
                 if (mLastBssid != null) {
                     sb.append(" lastbssid=").append(mLastBssid);
                 }
@@ -4513,6 +4513,7 @@ public class ClientModeImpl extends StateMachine {
                     }
                     break;
                 case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
+                    DisconnectEventInfo eventInfo = (DisconnectEventInfo) message.obj;
                     // Calling handleNetworkDisconnect here is redundant because we might already
                     // have called it when leaving L2ConnectedState to go to disconnecting state
                     // or thru other path
@@ -4522,8 +4523,13 @@ public class ClientModeImpl extends StateMachine {
                     // The side effect of calling handleNetworkDisconnect twice is that a bunch of
                     // idempotent commands are executed twice (stopping Dhcp, enabling the SPS mode
                     // at the chip etc...
+                    String targetSsid = getTargetSsid();
+                    newConnectionInProgress =
+                             (targetSsid != null && eventInfo.ssid != null &&
+                              !eventInfo.ssid.equals(targetSsid));
                     if (mVerboseLoggingEnabled) log("ConnectModeState: Network connection lost ");
-                    clearNetworkCachedDataIfNeeded(getTargetWifiConfiguration(), message.arg2);
+                    clearNetworkCachedDataIfNeeded(getTargetWifiConfiguration(),
+                                                   eventInfo.reasonCode);
                     handleNetworkDisconnect();
                     transitionTo(mDisconnectedState);
                     break;
@@ -5461,6 +5467,7 @@ public class ClientModeImpl extends StateMachine {
 
             switch(message.what) {
                 case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
+                    DisconnectEventInfo eventInfo = (DisconnectEventInfo) message.obj;
                     reportConnectionAttemptEnd(
                             WifiMetrics.ConnectionEvent.FAILURE_NETWORK_DISCONNECTION,
                             WifiMetricsProto.ConnectionEvent.HLF_NONE,
@@ -5468,8 +5475,8 @@ public class ClientModeImpl extends StateMachine {
                     mWifiInjector.getWifiLastResortWatchdog()
                             .noteConnectionFailureAndTriggerIfNeeded(
                                     getTargetSsid(),
-                                    (message.obj == null)
-                                    ? mTargetBssid : (String) message.obj,
+                                    (eventInfo.bssid == null)
+                                    ? mTargetBssid : eventInfo.bssid,
                                     WifiLastResortWatchdog.FAILURE_CODE_DHCP);
                     handleStatus = NOT_HANDLED;
                     break;
@@ -5634,16 +5641,17 @@ public class ClientModeImpl extends StateMachine {
                     break;
                 case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
                     // Throw away but only if it corresponds to the network we're roaming to
-                    String bssid = (String) message.obj;
+                    DisconnectEventInfo eventInfo = (DisconnectEventInfo) message.obj;
                     if (true) {
                         String target = "";
                         if (mTargetBssid != null) target = mTargetBssid;
                         log("NETWORK_DISCONNECTION_EVENT in roaming state"
-                                + " BSSID=" + bssid
+                                + " BSSID=" + eventInfo.bssid
                                 + " target=" + target);
                     }
-                    clearNetworkCachedDataIfNeeded(getTargetWifiConfiguration(), message.arg2);
-                    if (bssid != null && bssid.equals(mTargetBssid)) {
+                    clearNetworkCachedDataIfNeeded(getTargetWifiConfiguration(),
+                                                   eventInfo.reasonCode);
+                    if (eventInfo.bssid != null && eventInfo.bssid.equals(mTargetBssid)) {
                         handleNetworkDisconnect();
                         transitionTo(mDisconnectedState);
                     }
@@ -5791,6 +5799,7 @@ public class ClientModeImpl extends StateMachine {
                     break;
                 case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
                     long lastRoam = 0;
+                    DisconnectEventInfo eventInfo = (DisconnectEventInfo) message.obj;
                     reportConnectionAttemptEnd(
                             WifiMetrics.ConnectionEvent.FAILURE_NETWORK_DISCONNECTION,
                             WifiMetricsProto.ConnectionEvent.HLF_NONE,
@@ -5800,14 +5809,14 @@ public class ClientModeImpl extends StateMachine {
                         lastRoam = mClock.getWallClockMillis() - mLastDriverRoamAttempt;
                         mLastDriverRoamAttempt = 0;
                     }
-                    if (unexpectedDisconnectedReason(message.arg2)) {
+                    if (unexpectedDisconnectedReason(eventInfo.reasonCode)) {
                         mWifiDiagnostics.captureBugReportData(
                                 WifiDiagnostics.REPORT_REASON_UNEXPECTED_DISCONNECT);
                     }
 
-                    boolean localGen = message.arg1 == 1;
+                    boolean localGen = eventInfo.locallyGenerated;
                     if (!localGen) { // ignore disconnects initiated by wpa_supplicant.
-                        mWifiScoreCard.noteNonlocalDisconnect(message.arg2);
+                        mWifiScoreCard.noteNonlocalDisconnect(eventInfo.reasonCode);
                         mBssidBlocklistMonitor.handleBssidConnectionFailure(mWifiInfo.getBSSID(),
                                 mWifiInfo.getSSID(),
                                 BssidBlocklistMonitor.REASON_ABNORMAL_DISCONNECT,
@@ -5820,11 +5829,12 @@ public class ClientModeImpl extends StateMachine {
                                 + " BSSID=" + mWifiInfo.getBSSID()
                                 + " RSSI=" + mWifiInfo.getRssi()
                                 + " freq=" + mWifiInfo.getFrequency()
-                                + " reason=" + message.arg2
+                                + " reason=" + eventInfo.reasonCode
                                 + " Network Selection Status=" + (config == null ? "Unavailable"
                                     : config.getNetworkSelectionStatus().getNetworkStatusString()));
                     }
-                    NotifyBroadcastNetworkDisconnection(message.arg1, message.arg2);
+                    NotifyBroadcastNetworkDisconnection(eventInfo.locallyGenerated ? 1 : 0,
+                                                        eventInfo.reasonCode);
                     break;
                 case CMD_START_ROAM:
                     // Clear the driver roam indication since we are attempting a framework roam
@@ -6003,7 +6013,11 @@ public class ClientModeImpl extends StateMachine {
 
             /** clear the roaming state, if we were roaming, we failed */
             mIsAutoRoaming = false;
-            mTargetNetworkId = WifiConfiguration.INVALID_NETWORK_ID;
+
+            if (!newConnectionInProgress)
+                  mTargetNetworkId = WifiConfiguration.INVALID_NETWORK_ID;
+            else
+                  newConnectionInProgress = false;
 
             mIpReachabilityMonitorActive = false;
             removeMessages(CMD_IP_REACHABILITY_SESSION_END);
@@ -6024,15 +6038,17 @@ public class ClientModeImpl extends StateMachine {
                     break;
                 case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
                     stopIpClient();
-                    if (message.arg2 == 15 /* FOURWAY_HANDSHAKE_TIMEOUT */) {
-                        String bssid = (message.obj == null)
-                                ? mTargetBssid : (String) message.obj;
+                    DisconnectEventInfo eventInfo = (DisconnectEventInfo) message.obj;
+                    if (eventInfo.reasonCode == 15 /* FOURWAY_HANDSHAKE_TIMEOUT */) {
+                        String bssid = (eventInfo.bssid == null)
+                                ? mTargetBssid : eventInfo.bssid;
                         mWifiInjector.getWifiLastResortWatchdog()
                                 .noteConnectionFailureAndTriggerIfNeeded(
                                         getTargetSsid(), bssid,
                                         WifiLastResortWatchdog.FAILURE_CODE_AUTHENTICATION);
                     }
-                    clearNetworkCachedDataIfNeeded(getTargetWifiConfiguration(), message.arg2);
+                    clearNetworkCachedDataIfNeeded(getTargetWifiConfiguration(),
+                                                   eventInfo.reasonCode);
                     mWifiNative.qtiUpdateConnectedBand(STA_PRIMARY, WifiNative.ConnectedBand.BAND_NONE);
                     mTargetNetworkId = WifiConfiguration.INVALID_NETWORK_ID;
                     mWifiInfo.reset();

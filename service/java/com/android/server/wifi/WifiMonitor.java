@@ -528,9 +528,10 @@ public class WifiMonitor {
      * @param reason Disconnect reason code.
      * @param bssid BSSID of the access point.
      */
-    public void broadcastNetworkDisconnectionEvent(String iface, int local, int reason,
-                                                   String bssid) {
-        sendMessage(iface, NETWORK_DISCONNECTION_EVENT, local, reason, bssid);
+    public void broadcastNetworkDisconnectionEvent(String iface, boolean local, int reason,
+                                                   String ssid, String bssid) {
+        sendMessage(iface, NETWORK_DISCONNECTION_EVENT,
+                       new DisconnectEventInfo(ssid, bssid, reason, local));
     }
 
     /**
