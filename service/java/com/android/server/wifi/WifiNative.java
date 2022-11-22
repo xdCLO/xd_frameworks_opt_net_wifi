@@ -2705,6 +2705,16 @@ public class WifiNative {
     }
 
     /**
+     * Get the Local Network Configuration .
+     *
+     * @param ifaceName Name of the interface.
+     * @return WifiConfiguration.
+     */
+    public WifiConfiguration getCurrentNetworkLocalConfig(@NonNull String ifaceName) {
+        return mSupplicantStaIfaceHal.getCurrentNetworkLocalConfig(ifaceName);
+    }
+
+    /**
      * Get the currently configured network's WPS NFC token.
      *
      * @param ifaceName Name of the interface.

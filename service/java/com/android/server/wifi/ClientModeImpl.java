@@ -20,6 +20,7 @@ import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_NO_INTERNET_TEMPORARY;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_FILS_SHA256;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_FILS_SHA384;
+import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLED;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLING;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
@@ -6855,6 +6856,13 @@ public class ClientModeImpl extends StateMachine {
     }
 
     /**
+     * @return true if this device supports SAE
+     */
+    private boolean isWpa3SaeSupported() {
+        return (mWifiNative.getSupportedFeatureSet(mInterfaceName) & WIFI_FEATURE_WPA3_SAE) != 0;
+    }
+
+    /**
      * @return true if this device supports FILS-SHA256
      */
     private boolean isFilsSha256Supported() {
@@ -7305,6 +7313,8 @@ public class ClientModeImpl extends StateMachine {
             return;
         }
 
+        WifiConfiguration LocalConfig;
+        LocalConfig = mWifiNative.getCurrentNetworkLocalConfig(mInterfaceName);
         // check for FT/PSK
         ScanDetail scanDetail = getScanDetailForBssid(mLastBssid);
         if (scanDetail != null) {
@@ -7312,6 +7322,10 @@ public class ClientModeImpl extends StateMachine {
             String caps = (scanResult != null) ? scanResult.capabilities : "";
             if (caps.contains("FT/PSK")) {
                 Log.i(TAG, "Linked network - return as current connection is FT-PSK");
+                return;
+            } else if(caps.contains("SAE") && isWpa3SaeSupported() && (LocalConfig != null) &&
+                     LocalConfig.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.SAE)) {
+                Log.i(TAG, "Linked network - return as current connection is SAE");
                 return;
             }
         }
