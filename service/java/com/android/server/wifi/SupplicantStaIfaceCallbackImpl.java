@@ -58,6 +58,7 @@ abstract class SupplicantStaIfaceCallbackImpl extends ISupplicantStaIfaceCallbac
     private final WifiMonitor mWifiMonitor;
     // Used to help check for PSK password mismatch & EAP connection failure.
     private int mStateBeforeDisconnect = State.INACTIVE;
+    private String mCurrentSsid = null;
 
     SupplicantStaIfaceCallbackImpl(@NonNull SupplicantStaIfaceHal staIfaceHal,
             @NonNull String ifaceName,
@@ -201,6 +202,8 @@ abstract class SupplicantStaIfaceCallbackImpl extends ISupplicantStaIfaceCallbac
                 mWifiMonitor.broadcastNetworkConnectionEvent(
                         mIfaceName, mStaIfaceHal.getCurrentNetworkId(mIfaceName), filsHlpSent,
                         bssidStr);
+            } else if (newState == State.ASSOCIATING) {
+                mCurrentSsid = NativeUtil.encodeSsid(ssid);
             }
             mWifiMonitor.broadcastSupplicantStateChangeEvent(
                     mIfaceName, mStaIfaceHal.getCurrentNetworkId(mIfaceName), wifiSsid,
@@ -293,7 +296,7 @@ abstract class SupplicantStaIfaceCallbackImpl extends ISupplicantStaIfaceCallbac
                 }
             }
             mWifiMonitor.broadcastNetworkDisconnectionEvent(
-                    mIfaceName, locallyGenerated ? 1 : 0, reasonCode,
+                    mIfaceName, locallyGenerated, reasonCode, mCurrentSsid,
                     NativeUtil.macAddressFromByteArray(bssid));
         }
     }

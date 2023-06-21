@@ -5168,6 +5168,7 @@ public class QtiClientModeImpl extends StateMachine {
                                 ? mTargetBssid : (String) message.obj;
                     }
                     clearNetworkCachedDataIfNeeded(getTargetWifiConfiguration(), message.arg2);
+                    mWifiNative.qtiUpdateConnectedBand(mIdentity, WifiNative.ConnectedBand.BAND_NONE);
                     break;
                 case WifiMonitor.SUPPLICANT_STATE_CHANGE_EVENT:
                     StateChangeResult stateChangeResult = (StateChangeResult) message.obj;
@@ -5851,7 +5852,8 @@ public class QtiClientModeImpl extends StateMachine {
     }
     public List<ScanDetail> qtiGetFilteredScan(List<ScanDetail> scanDetails) {
         // All Bands are available for use
-        if (mWifiNative.qtiConnectedbands.get(WifiNative.ConnectedBand.BAND_NONE))
+        if (!mWifiNative.isDualStaSupported() ||
+                mWifiNative.qtiConnectedbands.get(WifiNative.ConnectedBand.BAND_NONE))
             return scanDetails;
 
         boolean filter2G = false;

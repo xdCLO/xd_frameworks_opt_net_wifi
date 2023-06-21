@@ -1024,16 +1024,22 @@ public class SupplicantStaIfaceHalTest extends WifiBaseTest {
         executeAndValidateInitializationSequence();
         assertNotNull(mISupplicantStaIfaceCallback);
 
+        // Set the SSID for the current connection.
+        mISupplicantStaIfaceCallback.onStateChanged(
+                        ISupplicantStaIfaceCallback.State.ASSOCIATING,
+                        NativeUtil.macAddressToByteArray(BSSID),
+                        SUPPLICANT_NETWORK_ID,
+                        NativeUtil.decodeSsid(SUPPLICANT_SSID));
         int reasonCode = 5;
         mISupplicantStaIfaceCallback.onDisconnected(
                 NativeUtil.macAddressToByteArray(BSSID), true, reasonCode);
         verify(mWifiMonitor).broadcastNetworkDisconnectionEvent(
-                eq(WLAN0_IFACE_NAME), eq(1), eq(reasonCode), eq(BSSID));
+                eq(WLAN0_IFACE_NAME), eq(true), eq(reasonCode), eq(SUPPLICANT_SSID), eq(BSSID));
 
         mISupplicantStaIfaceCallback.onDisconnected(
                 NativeUtil.macAddressToByteArray(BSSID), false, reasonCode);
         verify(mWifiMonitor).broadcastNetworkDisconnectionEvent(
-                eq(WLAN0_IFACE_NAME), eq(0), eq(reasonCode), eq(BSSID));
+                eq(WLAN0_IFACE_NAME), eq(false), eq(reasonCode), eq(SUPPLICANT_SSID), eq(BSSID));
     }
 
     /**
