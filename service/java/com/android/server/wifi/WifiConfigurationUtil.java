@@ -426,7 +426,8 @@ public class WifiConfigurationUtil {
         return true;
     }
 
-    private static boolean validatePassword(String password, boolean isAdd, boolean isSae) {
+    private static boolean validatePassword(String password, boolean isAdd, boolean isSae,
+            boolean isWapi) {
         if (isAdd) {
             if (password == null) {
                 Log.e(TAG, "validatePassword: null string");
@@ -467,8 +468,14 @@ public class WifiConfigurationUtil {
                 return false;
             }
         } else {
-            // HEX PSK string
-            if (password.length() != PSK_SAE_HEX_LEN) {
+            if (isWapi) {
+                // Protect system against malicious actors injecting arbitrarily large passwords.
+                if (password.length() > 100) {
+                    Log.e(TAG, "validatePassword failed: WAPI hex string too long: "
+                            + password.length());
+                    return false;
+                }
+            } else if (password.length() != PSK_SAE_HEX_LEN) {
                 Log.e(TAG, "validatePassword failed: hex string size mismatch: "
                         + password.length());
                 return false;
@@ -613,11 +620,11 @@ public class WifiConfigurationUtil {
             return false;
         }
         if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WPA_PSK)
-                && !validatePassword(config.preSharedKey, isAdd, false)) {
+                && !validatePassword(config.preSharedKey, isAdd, false, false)) {
             return false;
         }
         if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WAPI_PSK)
-                && !validatePassword(config.preSharedKey, isAdd, false)) {
+                && !validatePassword(config.preSharedKey, isAdd, false, true)) {
             return false;
         }
         if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.OWE)) {
@@ -633,7 +640,7 @@ public class WifiConfigurationUtil {
                 Log.e(TAG, "PMF must be enabled for SAE networks");
                 return false;
             }
-            if (!validatePassword(config.preSharedKey, isAdd, true)) {
+            if (!validatePassword(config.preSharedKey, isAdd, true, false)) {
                 return false;
             }
         }
@@ -778,7 +785,7 @@ public class WifiConfigurationUtil {
             return false;
         }
         if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WPA_PSK)
-                && !validatePassword(config.preSharedKey, true, false)) {
+                && !validatePassword(config.preSharedKey, true, false, false)) {
             return false;
         }
         if (config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.OWE)) {
@@ -792,7 +799,7 @@ public class WifiConfigurationUtil {
             if (!config.requirePmf) {
                 return false;
             }
-            if (!validatePassword(config.preSharedKey, true, true)) {
+            if (!validatePassword(config.preSharedKey, true, true, false)) {
                 return false;
             }
         }
